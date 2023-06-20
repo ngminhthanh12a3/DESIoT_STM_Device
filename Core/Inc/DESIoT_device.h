@@ -10,6 +10,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
 
 // DESIoT virtual storages
 #define DESIOT_VS0 0x0u
@@ -45,9 +46,74 @@
 #define DESIOT_VS30 0x1Eu
 #define DESIOT_VS31 0x1Fu
 
+// Lengths of packet types
+#define DESIOT_H1_LEN 1u
+#define DESIOT_H2_LEN 1u
+#define DESIOT_HEAD_LEN (DESIOT_H1_LEN + DESIOT_H2_LEN)
+
+#define DESIOT_T1_LEN 1u
+#define DESIOT_T2_LEN 1u
+#define DESIOT_TRAIL_LEN (DESIOT_T1_LEN + DESIOT_T2_LEN)
+
+#define DESIOT_HEADERS_LEN (DESIOT_HEAD_LEN + DESIOT_TRAIL_LEN)
+
+#define DESIOT_CRC_LEN 2u
+
+#define DESIOT_CMD_LEN 0x1u
+#define DESIOT_DATALEN_LEN 0x2u
+
+// Length of packet assigning integer
+#define DESIOT_VS_ID_LEN 0x1u
+#define DESIOT_VS_INTEGER_LEN 0x4u
+#define DESIOT_ASSIGN_INT_PKG_LEN (DESIOT_VS_ID_LEN + DESIOT_VS_INTEGER_LEN)
+
+// DESIoT default values
+#define DESIOT_H1_DEFAULT 0x7u
+#define DESIOT_H2_DEFAULT 0x17u
+#define DESIOT_T1_DEFAULT 0x7u
+#define DESIOT_T2_DEFAULT 0x17u
+
+#define DESIOT_SENDBYTES_F_NAME DESIoT_sendBytes
+#define DESIOT_SENDBYTES \
+	void DESIOT_SENDBYTES_F_NAME (size_t DESIOT_ATT_UNUSED size, uint8_t DESIOT_ATT_UNUSED *bytes)
+
+// attributes
+#define DESIOT_ATT_PACKED __attribute__ ((__packed__))
+#define DESIOT_ATT_UNUSED __attribute__((__unused__))
+#define DESIOT_ATT_WEAK __attribute__((weak))
+
+// CRC
+#define DESIOT_CRC_GENERATOR 0x1305
+
+enum DESIoTCMD {
+	DESIOT_CMD_ASSIGN_VIRTUAL_STORAGE
+};
+
+typedef struct {
+	uint8_t h1;
+	uint8_t h2;
+}DESIOT_ATT_PACKED DESIoT_headFrame_t;
+
+typedef struct {
+	uint8_t t1;
+	uint8_t t2;
+	uint16_t crc;
+} DESIOT_ATT_PACKED DESIoT_trailFrame_t;
+
+typedef struct{
+	uint8_t cmd;
+	uint16_t dataLen;
+	uint8_t *data;
+} DESIOT_ATT_PACKED DESIoT_dataPacket_t;
+
 void DESIoT_begin();
 void DESIoT_loop();
 void DESIOT_Rx1byte(uint8_t rxByte);
 void DESIoT_assignInt(uint8_t VS, size_t integer);
+void DESIoT_sendDataPacket(const size_t dataLen, uint8_t *data);
+void DESIoT_CalculateTable_CRC16();
+uint16_t DESIoT_Compute_CRC16(uint8_t *bytes, const int32_t BYTES_LEN);
 
+// weak functions
+DESIOT_SENDBYTES;
 #endif /* INC_DESIOT_DEVICE_H_ */

@@ -20,3 +20,8 @@ void DESIOT_Rx1byte(uint8_t rxByte)
 {
 
 }
+
+void DESIoT_assignInt(uint8_t VS, size_t integer)
+{
+
+}

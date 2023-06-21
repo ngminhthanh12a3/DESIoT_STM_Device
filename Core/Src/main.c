@@ -101,9 +101,10 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 		DESIoT_loop();
-		if(HAL_GetTick() - lastTick > 1000)
+		if(HAL_GetTick() - lastTick > 10000)
 		{
 			DESIoT_assignInt(DESIOT_VS0, lastTick);
+			HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_9);
 			lastTick = HAL_GetTick();
 		}
 	}

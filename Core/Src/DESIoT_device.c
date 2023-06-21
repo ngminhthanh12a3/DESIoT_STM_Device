@@ -31,7 +31,7 @@ void DESIoT_assignInt(uint8_t VS, size_t integer)
 	DESIoT_dataPacket_t *pDataPacket = (DESIoT_dataPacket_t*)dataPacket;
 
 	pDataPacket->cmd = DESIOT_CMD_ASSIGN_VIRTUAL_STORAGE;
-	pDataPacket->dataLen = sizeof(integer);
+	pDataPacket->dataLen = sizeof(integer) + sizeof(pDataPacket->cmd);
 
 	uint8_t *data = (dataPacket + DESIOT_CMD_LEN + DESIOT_DATALEN_LEN);
 	data[0] = VS; // assign VS

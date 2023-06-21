@@ -62,6 +62,8 @@
 #define DESIOT_CMD_LEN 0x1u
 #define DESIOT_DATALEN_LEN 0x2u
 
+#define DESIOT_HEAD_FRAME_LEN (DESIOT_HEAD_LEN + DESIOT_CMD_LEN + DESIOT_DATALEN_LEN)
+
 // Length of packet assigning integer
 #define DESIOT_VS_ID_LEN 0x1u
 #define DESIOT_VS_INTEGER_LEN 0x4u
@@ -102,8 +104,8 @@ typedef struct {
 
 typedef struct{
 	uint8_t cmd;
-	uint16_t dataLen;
-	uint8_t *data;
+	uint16_t dataLen : 10;
+	uint8_t data[UINT16_MAX & 0x3FFu];
 } DESIOT_ATT_PACKED DESIoT_dataPacket_t;
 
 void DESIoT_begin();

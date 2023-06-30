@@ -8,9 +8,7 @@
 
 #include "DESIoT_device.h"
 
-void DESIoT_begin() {
-
-}
+DESIoT_Frame_Hander_t hFrame;
 
 void DESIoT_loop() {
 
@@ -28,9 +26,11 @@ void DESIoT_assignInt(uint8_t VS, size_t integer)
 {
 	DESIoT_dataPacket_t dataPacket;
 	dataPacket.cmd = DESIOT_CMD_ASSIGN_VIRTUAL_STORAGE;
-	dataPacket.dataLen = sizeof(integer) + sizeof(dataPacket.cmd);
-	dataPacket.data[0] = VS;
-	memcpy(dataPacket.data + 1, &integer, sizeof(integer));
+	dataPacket.dataLen = DESIOT_DEVICE_ID_SIZE + sizeof(VS) + sizeof(integer); // add 12-byte device ID
+
+	// ignore 12-byte data for device ID
+	dataPacket.data[DESIOT_DEVICE_ID_SIZE] = VS;
+	memcpy(dataPacket.data + DESIOT_DEVICE_ID_SIZE + 1, &integer, sizeof(integer));
 
 	DESIoT_sendDataPacket(DESIOT_CMD_LEN + DESIOT_DATALEN_LEN + dataPacket.dataLen,
 			(uint8_t*)&dataPacket);
@@ -55,6 +55,8 @@ void DESIoT_sendDataPacket(const size_t dataLen, uint8_t *data)
 
 	// set data packet to frame
 	memcpy(frame + DESIOT_HEAD_LEN, data, dataLen);
+	// set device ID
+	memcpy(frame + DESIOT_HEAD_LEN + DESIOT_CMD_LEN + DESIOT_DATALEN_LEN, hFrame.device_id, DESIOT_DEVICE_ID_SIZE);
 
 	trailFrame->crc = DESIoT_Compute_CRC16(data, dataLen);
 	DESIOT_SENDBYTES_F_NAME(sizeof(frame), frame);
@@ -69,38 +71,49 @@ unsigned short crctable16[256] = {0x0000, 0x1305, 0x260A, 0x350F, 0x4C14, 0x5F11
 
 void DESIoT_CalculateTable_CRC16()
 {
-    for (int divident = 0; divident < 256; divident++) /* iterate over all possible input byte values 0 - 255 */
-    {
-        unsigned short curByte = (unsigned short)(divident << 8); /* move divident byte into MSB of 16Bit CRC */
-        for (unsigned char bit = 0; bit < 8; bit++)
-        {
-            if ((curByte & 0x8000) != 0)
-            {
-                curByte <<= 1;
-                curByte ^= DESIOT_CRC_GENERATOR;
-            }
-            else
-                curByte <<= 1;
-        }
+	for (int divident = 0; divident < 256; divident++) /* iterate over all possible input byte values 0 - 255 */
+	{
+		unsigned short curByte = (unsigned short)(divident << 8); /* move divident byte into MSB of 16Bit CRC */
+		for (unsigned char bit = 0; bit < 8; bit++)
+		{
+			if ((curByte & 0x8000) != 0)
+			{
+				curByte <<= 1;
+				curByte ^= DESIOT_CRC_GENERATOR;
+			}
+			else
+				curByte <<= 1;
+		}
 
-        crctable16[divident] = curByte;
-    }
+		crctable16[divident] = curByte;
+	}
 }
 
 uint16_t DESIoT_Compute_CRC16(uint8_t *bytes, const int32_t BYTES_LEN)
 {
-    uint16_t crc = 0;
+	uint16_t crc = 0;
 
-    for (int32_t i = 0; i < BYTES_LEN; i++)
-    {
-        uint8_t b = bytes[i];
+	for (int32_t i = 0; i < BYTES_LEN; i++)
+	{
+		uint8_t b = bytes[i];
 
-        /* XOR-in next input byte into MSB of crc, that's our new intermediate divident */
-        uint8_t pos = (uint8_t)((crc >> 8) ^ b);
-        /* Shift out the MSB used for division per lookuptable and XOR with the remainder */
-        crc = (uint16_t)((crc << 8) ^ (uint16_t)(crctable16[pos]));
-    }
-    //	printf("\nHERE 3");
+		/* XOR-in next input byte into MSB of crc, that's our new intermediate divident */
+		uint8_t pos = (uint8_t)((crc >> 8) ^ b);
+		/* Shift out the MSB used for division per lookuptable and XOR with the remainder */
+		crc = (uint16_t)((crc << 8) ^ (uint16_t)(crctable16[pos]));
+	}
+	//	printf("\nHERE 3");
 
-    return crc;
+	return crc;
+}
+
+void DESIoT_hexToU8Array(const char *hexStr, uint8_t *buf, size_t bufSize)
+{
+	const char *pos = hexStr;
+	/* WARNING: no sanitization or error-checking whatsoever */
+	for (size_t i = 0; i < bufSize / sizeof(*buf); i++)
+	{
+		int n = sscanf(pos, "%2x", &buf[i]);
+		pos += 2;
+	}
 }

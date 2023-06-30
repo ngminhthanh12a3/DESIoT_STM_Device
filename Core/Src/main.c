@@ -21,6 +21,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#define DESIOT_DEVICE_ID "649aeb433cfc91e9f9d430f1"
+
 #include "DESIoT_device.h"
 /* USER CODE END Includes */
 
@@ -219,10 +221,12 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 	DESIOT_Rx1byte(rxByte);
 	HAL_UART_Receive_IT(huart, &ITReceive, 1);
 }
+
 DESIOT_SENDBYTES
 {
 	HAL_UART_Transmit(&huart6, bytes, size, 1000);
 }
+
 /* USER CODE END 4 */
 
 /**

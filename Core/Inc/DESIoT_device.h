@@ -8,6 +8,7 @@
 #ifndef INC_DESIOT_DEVICE_H_
 #define INC_DESIOT_DEVICE_H_
 
+#include <stdio.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
@@ -64,6 +65,8 @@
 
 #define DESIOT_HEAD_FRAME_LEN (DESIOT_HEAD_LEN + DESIOT_CMD_LEN + DESIOT_DATALEN_LEN)
 
+#define DESIOT_DEVICE_ID_SIZE 12u
+
 // Length of packet assigning integer
 #define DESIOT_VS_ID_LEN 0x1u
 #define DESIOT_VS_INTEGER_LEN 0x4u
@@ -94,6 +97,8 @@ enum DESIoTCMD {
 typedef struct {
 	uint8_t h1;
 	uint8_t h2;
+	uint8_t cmd;
+	uint16_t dataLen : 10;
 }DESIOT_ATT_PACKED DESIoT_headFrame_t;
 
 typedef struct {
@@ -108,14 +113,29 @@ typedef struct{
 	uint8_t data[UINT16_MAX & 0x3FFu];
 } DESIOT_ATT_PACKED DESIoT_dataPacket_t;
 
-void DESIoT_begin();
+typedef struct{
+	uint8_t device_id[DESIOT_DEVICE_ID_SIZE];
+} DESIoT_Frame_Hander_t;
+
+extern DESIoT_Frame_Hander_t hFrame;
+
 void DESIoT_loop();
 void DESIOT_Rx1byte(uint8_t rxByte);
 void DESIoT_assignInt(uint8_t VS, size_t integer);
 void DESIoT_sendDataPacket(const size_t dataLen, uint8_t *data);
 void DESIoT_CalculateTable_CRC16();
 uint16_t DESIoT_Compute_CRC16(uint8_t *bytes, const int32_t BYTES_LEN);
+// String to HEX
+void DESIoT_hexToU8Array(const char *hexStr, uint8_t *buf, size_t bufSize);
+
+// static funcs
+static void DESIoT_begin() {
+#if defined(DESIOT_DEVICE_ID)
+	DESIoT_hexToU8Array(DESIOT_DEVICE_ID, hFrame.device_id, sizeof(hFrame.device_id));
+#endif
+}
 
 // weak functions
 DESIOT_SENDBYTES;
+
 #endif /* INC_DESIOT_DEVICE_H_ */

@@ -26,11 +26,11 @@ void DESIoT_assignInt(uint8_t VS, size_t integer)
 {
 	DESIoT_dataPacket_t dataPacket;
 	dataPacket.cmd = DESIOT_CMD_ASSIGN_VIRTUAL_STORAGE;
-	dataPacket.dataLen = DESIOT_DEVICE_ID_SIZE + sizeof(VS) + sizeof(integer); // add 12-byte device ID
+	dataPacket.dataLen = DESIOT_ADDITIONAL_DATA_SIZE + sizeof(VS) + sizeof(integer); // add bytes of additional data
 
 	// ignore 12-byte data for device ID
-	dataPacket.data[DESIOT_DEVICE_ID_SIZE] = VS;
-	memcpy(dataPacket.data + DESIOT_DEVICE_ID_SIZE + 1, &integer, sizeof(integer));
+	dataPacket.data[DESIOT_ADDITIONAL_DATA_SIZE] = VS;
+	memcpy(dataPacket.data + DESIOT_ADDITIONAL_DATA_SIZE + 1, &integer, sizeof(integer));
 
 	DESIoT_sendDataPacket(DESIOT_CMD_LEN + DESIOT_DATALEN_LEN + dataPacket.dataLen,
 			(uint8_t*)&dataPacket);
@@ -53,12 +53,21 @@ void DESIoT_sendDataPacket(const size_t dataLen, uint8_t *data)
 	trailFrame->t1 = DESIOT_T1_DEFAULT;
 	trailFrame->t2 = DESIOT_T2_DEFAULT;
 
-	// set data packet to frame
-	memcpy(frame + DESIOT_HEAD_LEN, data, dataLen);
-	// set device ID
-	memcpy(frame + DESIOT_HEAD_LEN + DESIOT_CMD_LEN + DESIOT_DATALEN_LEN, hFrame.device_id, DESIOT_DEVICE_ID_SIZE);
+	{
+		size_t i = DESIOT_HEAD_LEN;
+		// set data packet to frame
+		memcpy(frame + i, data, dataLen);
 
-	trailFrame->crc = DESIoT_Compute_CRC16(data, dataLen);
+		// set config ID
+		i += (DESIOT_CMD_LEN + DESIOT_DATALEN_LEN);
+		memcpy(frame + i, hFrame.config_id, DESIOT_CONFIG_ID_SIZE);
+		// set device ID
+		i += DESIOT_CONFIG_ID_SIZE;
+		memcpy(frame + i, hFrame.device_id, DESIOT_DEVICE_ID_SIZE);
+	}
+
+
+	trailFrame->crc = DESIoT_Compute_CRC16(frame + DESIOT_HEAD_LEN, dataLen);
 	DESIOT_SENDBYTES_F_NAME(sizeof(frame), frame);
 }
 
@@ -105,15 +114,4 @@ uint16_t DESIoT_Compute_CRC16(uint8_t *bytes, const int32_t BYTES_LEN)
 	//	printf("\nHERE 3");
 
 	return crc;
-}
-
-void DESIoT_hexToU8Array(const char *hexStr, uint8_t *buf, size_t bufSize)
-{
-	const char *pos = hexStr;
-	/* WARNING: no sanitization or error-checking whatsoever */
-	for (size_t i = 0; i < bufSize / sizeof(*buf); i++)
-	{
-		int n = sscanf(pos, "%2x", &buf[i]);
-		pos += 2;
-	}
 }

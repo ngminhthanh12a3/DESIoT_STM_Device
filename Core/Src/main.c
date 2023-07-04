@@ -21,7 +21,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#define DESIOT_DEVICE_ID "649aeb433cfc91e9f9d430f1"
+#define DESIOT_CONFIG_ID "649f77093ffebb1238095b2f"
+#define DESIOT_DEVICE_ID "649f77183ffebb1238095b35"
 
 #include "DESIoT_device.h"
 /* USER CODE END Includes */
@@ -105,9 +106,10 @@ int main(void)
 		DESIoT_loop();
 		if(HAL_GetTick() - lastTick > 5000)
 		{
-			DESIoT_assignInt(DESIOT_VS0, lastTick);
-			HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_9);
 			lastTick = HAL_GetTick();
+			DESIoT_assignInt(DESIOT_VS0, lastTick);
+//			HAL_UART_Transmit(&huart6, "hello", 6, 1000);
+			HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_9);
 		}
 	}
   /* USER CODE END 3 */

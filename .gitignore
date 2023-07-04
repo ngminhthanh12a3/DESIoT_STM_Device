@@ -66,3 +66,5 @@ ctrlp.root
 
 #html
 *.html
+Debug/DESIoT_STM_Device.bin
+Debug/DESIoT_STM_Device.list

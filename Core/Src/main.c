@@ -21,6 +21,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+//#define DESIOT_CONFIG_ID "64ad6214be6e055b5800865a"
+//#define DESIOT_DEVICE_ID "64ad621cbe6e055b5800865e"
 #define DESIOT_CONFIG_ID "649f77093ffebb1238095b2f"
 #define DESIOT_DEVICE_ID "649f77183ffebb1238095b35"
 
@@ -104,12 +106,12 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 		DESIoT_loop();
-		if(HAL_GetTick() - lastTick > 5000)
+		if(HAL_GetTick() - lastTick > 1000)
 		{
 			lastTick = HAL_GetTick();
 			DESIoT_assignInt(DESIOT_VS0, lastTick);
 //			HAL_UART_Transmit(&huart6, "hello", 6, 1000);
-			HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_9);
+//			HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_9);
 		}
 	}
   /* USER CODE END 3 */
@@ -229,6 +231,12 @@ DESIOT_SENDBYTES
 	HAL_UART_Transmit(&huart6, bytes, size, 1000);
 }
 
+DESIOT_MILLIS {
+	return HAL_GetTick();
+}
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS1) {
+	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, payload[0]);
+}
 /* USER CODE END 4 */
 
 /**

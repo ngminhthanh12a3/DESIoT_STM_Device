@@ -8,15 +8,33 @@
 
 #include "DESIoT_device.h"
 
-DESIoT_Frame_Hander_t hFrame;
+DESIoT_Frame_Hander_t hFrame = {.index = 0};
+DESIoT_CBUF_t hGatewayCBuffer = {.start = 0, .end = 0};
 
 void DESIoT_loop() {
+    DESIoT_frameFailedHandler();
+    DESIoT_frameSuccessHandler();
+    DESIoT_frameTimeoutHandler();
+    DESIoT_frameArbitrating();
+}
 
+void DESIoT_frameArbitrating()
+{
+    // arbitrating for Gateway
+    if (hFrame.status == DESIOT_FRAME_IDLE || hFrame.status == DESIOT_FRAME_IN_GATEWAY_PROGRESS)
+    {
+        uint8_t rx;
+        if (DESIoT_CBUF_getByte(&hGatewayCBuffer, &rx) == DESIOT_CBUF_OK)
+        {
+            hFrame.status = DESIOT_FRAME_IN_GATEWAY_PROGRESS;
+            DESIoT_FRAME_parsing(&hFrame, rx);
+        }
+    }
 }
 
 void DESIOT_Rx1byte(uint8_t rxByte)
 {
-
+	DESIoT_CBUF_putByte(&hGatewayCBuffer, rxByte);
 }
 
 /**
@@ -115,3 +133,280 @@ uint16_t DESIoT_Compute_CRC16(uint8_t *bytes, const int32_t BYTES_LEN)
 
 	return crc;
 }
+
+void DESIoT_CBUF_putByte(DESIoT_CBUF_t *hCBuf, uint8_t rx)
+{
+    hCBuf->buffer[hCBuf->end++] = rx;
+    hCBuf->end %= DESIOT_CIR_BUF_SIZE;
+}
+
+uint8_t DESIoT_CBUF_getByte(DESIoT_CBUF_t *hCBuf, uint8_t *rx)
+{
+    if (hCBuf->end != hCBuf->start)
+    {
+        *rx = hCBuf->buffer[hCBuf->start++];
+        hCBuf->start %= DESIOT_CIR_BUF_SIZE;
+        return DESIOT_CBUF_OK;
+    }
+
+    return DESIOT_CBUF_ERROR;
+}
+
+void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte)
+{
+    switch (hFrame->index)
+    {
+    case DESIOT_H1_INDEX:
+        hFrame->millis = DESIoT_millis();
+        if (byte == DESIOT_H1_DEFAULT)
+            hFrame->frame.h1 = byte;
+
+        else
+            DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
+        break;
+    case DESIOT_H2_INDEX:
+        if (byte == DESIOT_H2_DEFAULT)
+            hFrame->frame.h2 = byte;
+        else
+            DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
+        break;
+    case DESIOT_CMD_INDEX:
+        hFrame->frame.dataPacket.cmd = byte;
+        break;
+    case DESIOT_DATALEN_INDEX:
+        hFrame->frame.dataPacket.dataLenArr[0] = byte;
+        break;
+    case DESIOT_DATALEN_INDEX + 1:
+        hFrame->frame.dataPacket.dataLenArr[1] = byte;
+        break;
+    default:
+        if (hFrame->index == (DESIOT_HEAD_FRAME_LEN + hFrame->frame.dataPacket.dataLen)) // t1
+        {
+            if (byte == DESIOT_T1_DEFAULT)
+                hFrame->frame.t1 = byte;
+            else
+                DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
+        }
+        else if (hFrame->index == (DESIOT_HEAD_FRAME_LEN + hFrame->frame.dataPacket.dataLen + 1)) // t2
+        {
+            if (byte == DESIOT_T2_DEFAULT)
+                hFrame->frame.t2 = byte;
+            else
+                DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
+        }
+        else if (hFrame->index == (DESIOT_HEAD_FRAME_LEN + hFrame->frame.dataPacket.dataLen + 2)) // crc1
+        {
+            hFrame->frame.crcArr[0] = byte;
+        }
+        else if (hFrame->index == (DESIOT_HEAD_FRAME_LEN + hFrame->frame.dataPacket.dataLen + 3)) // crc2
+        {
+            hFrame->frame.crcArr[1] = byte;
+            uint16_t crcCalculate = DESIoT_Compute_CRC16((uint8_t *)&hFrame->frame.dataPacket, DESIOT_CMD_LEN + DESIOT_DATALEN_LEN + hFrame->frame.dataPacket.dataLen);
+            if (crcCalculate == hFrame->frame.crc)
+                DESIOT_SET_FRAME_SUCCESS_STATUS(hFrame->status);
+            else
+            {
+                DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
+            }
+        }
+        else
+        {
+            hFrame->frame.dataPacket.data[hFrame->index - (DESIOT_HEAD_LEN + DESIOT_CMD_LEN + DESIOT_DATALEN_LEN)] = byte;
+        }
+        break;
+    }
+    hFrame->index++;
+}
+
+
+void DESIoT_frameFailedHandler()
+{
+    switch (hFrame.status)
+    {
+    case DESIOT_FRAME_GATEWAY_FAILED:
+        DESIoT_restartFrameIndexes();
+        break;
+    }
+}
+
+void DESIoT_frameSuccessHandler()
+{
+    switch (hFrame.status)
+    {
+    case DESIOT_FRAME_GATEWAY_SUCCESS:
+
+    	DESIoT_execSuccessfulFrame();
+        DESIoT_restartFrameIndexes();
+
+        break;
+
+    default:
+        break;
+    }
+}
+
+void DESIoT_restartFrameIndexes()
+{
+    hFrame.status = DESIOT_FRAME_IDLE;
+    hFrame.index = 0;
+}
+
+void DESIoT_frameTimeoutHandler()
+{
+    if (DESIOT_IS_FRAME_ON_PROCESS_STATUS(hFrame.status))
+        if (DESIOT_MILLIS_F_NAME() - hFrame.millis > DESIOT_TIMEOUT_DURATION)
+        {
+            DESIoT_restartFrameIndexes();
+        }
+}
+
+void DESIoT_execSuccessfulFrame() {
+	switch (hFrame.frame.dataPacket.cmd) {
+		case DESIOT_CMD_SYNC_VIRTUAL_STORAGE:
+			DESIoT_execVSyncWF();
+			break;
+		default:
+			break;
+	}
+}
+
+void DESIoT_execVSyncWF() {
+	char payload[DESIOT_MAX_VSSYNC_PAYLOAD_SIZE];
+	size_t len = hFrame.frame.dataPacket.dataLen - 1;
+	uint8_t VSID = hFrame.frame.dataPacket.data[0];
+
+	memcpy(payload,hFrame.frame.dataPacket.data + 1, len);
+
+	switch (VSID) {
+	case DESIOT_VS0:
+		DESIOT_EXEC_SYNC(DESIOT_VS0, payload, len);
+		break;
+	case DESIOT_VS1:
+		DESIOT_EXEC_SYNC(DESIOT_VS1, payload, len);
+		break;
+	case DESIOT_VS2:
+		DESIOT_EXEC_SYNC(DESIOT_VS2, payload, len);
+		break;
+	case DESIOT_VS3:
+		DESIOT_EXEC_SYNC(DESIOT_VS3, payload, len);
+		break;
+	case DESIOT_VS4:
+		DESIOT_EXEC_SYNC(DESIOT_VS4, payload, len);
+		break;
+	case DESIOT_VS5:
+		DESIOT_EXEC_SYNC(DESIOT_VS5, payload, len);
+		break;
+	case DESIOT_VS6:
+		DESIOT_EXEC_SYNC(DESIOT_VS6, payload, len);
+		break;
+	case DESIOT_VS7:
+		DESIOT_EXEC_SYNC(DESIOT_VS7, payload, len);
+		break;
+	case DESIOT_VS8:
+		DESIOT_EXEC_SYNC(DESIOT_VS8, payload, len);
+		break;
+	case DESIOT_VS9:
+		DESIOT_EXEC_SYNC(DESIOT_VS9, payload, len);
+		break;
+	case DESIOT_VS10:
+		DESIOT_EXEC_SYNC(DESIOT_VS10, payload, len);
+		break;
+	case DESIOT_VS11:
+		DESIOT_EXEC_SYNC(DESIOT_VS11, payload, len);
+		break;
+	case DESIOT_VS12:
+		DESIOT_EXEC_SYNC(DESIOT_VS12, payload, len);
+		break;
+	case DESIOT_VS13:
+		DESIOT_EXEC_SYNC(DESIOT_VS13, payload, len);
+		break;
+	case DESIOT_VS14:
+		DESIOT_EXEC_SYNC(DESIOT_VS14, payload, len);
+		break;
+	case DESIOT_VS15:
+		DESIOT_EXEC_SYNC(DESIOT_VS15, payload, len);
+		break;
+	case DESIOT_VS16:
+		DESIOT_EXEC_SYNC(DESIOT_VS16, payload, len);
+		break;
+	case DESIOT_VS17:
+		DESIOT_EXEC_SYNC(DESIOT_VS17, payload, len);
+		break;
+	case DESIOT_VS18:
+		DESIOT_EXEC_SYNC(DESIOT_VS18, payload, len);
+		break;
+	case DESIOT_VS19:
+		DESIOT_EXEC_SYNC(DESIOT_VS19, payload, len);
+		break;
+	case DESIOT_VS20:
+		DESIOT_EXEC_SYNC(DESIOT_VS20, payload, len);
+		break;
+	case DESIOT_VS21:
+		DESIOT_EXEC_SYNC(DESIOT_VS21, payload, len);
+		break;
+	case DESIOT_VS22:
+		DESIOT_EXEC_SYNC(DESIOT_VS22, payload, len);
+		break;
+	case DESIOT_VS23:
+		DESIOT_EXEC_SYNC(DESIOT_VS23, payload, len);
+		break;
+	case DESIOT_VS24:
+		DESIOT_EXEC_SYNC(DESIOT_VS24, payload, len);
+		break;
+	case DESIOT_VS25:
+		DESIOT_EXEC_SYNC(DESIOT_VS25, payload, len);
+		break;
+	case DESIOT_VS26:
+		DESIOT_EXEC_SYNC(DESIOT_VS26, payload, len);
+		break;
+	case DESIOT_VS27:
+		DESIOT_EXEC_SYNC(DESIOT_VS27, payload, len);
+		break;
+	case DESIOT_VS28:
+		DESIOT_EXEC_SYNC(DESIOT_VS28, payload, len);
+		break;
+	case DESIOT_VS29:
+		DESIOT_EXEC_SYNC(DESIOT_VS29, payload, len);
+		break;
+	case DESIOT_VS30:
+		DESIOT_EXEC_SYNC(DESIOT_VS30, payload, len);
+		break;
+	case DESIOT_VS31:
+		DESIOT_EXEC_SYNC(DESIOT_VS31, payload, len);
+		break;
+	}
+
+}
+
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS0) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS1) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS2) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS3) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS4) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS5) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS6) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS7) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS8) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS9) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS10) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS11) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS12) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS13) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS14) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS15) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS16) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS17) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS18) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS19) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS20) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS21) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS22) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS23) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS24) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS25) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS26) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS27) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS28) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS29) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS30) {}
+DESIOT_ATT_WEAK DESIOT_DEF_EXEC_SYNC(DESIOT_VS31) {}

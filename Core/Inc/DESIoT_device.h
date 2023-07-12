@@ -81,18 +81,34 @@
 
 #define DESIOT_SENDBYTES_F_NAME DESIoT_sendBytes
 #define DESIOT_SENDBYTES \
-	void DESIOT_SENDBYTES_F_NAME (size_t DESIOT_ATT_UNUSED size, uint8_t DESIOT_ATT_UNUSED *bytes)
+		void DESIOT_SENDBYTES_F_NAME (size_t DESIOT_ATT_UNUSED size, uint8_t DESIOT_ATT_UNUSED *bytes)
 
 // attributes
 #define DESIOT_ATT_PACKED __attribute__ ((__packed__))
 #define DESIOT_ATT_UNUSED __attribute__((__unused__))
 #define DESIOT_ATT_WEAK __attribute__((weak))
 
+// VS SYNC EXECs
+#define DESIOT_MAX_VSSYNC_PAYLOAD_SIZE UINT8_MAX
+#define DESIOT_DEF_EXEC_SYNC(VS) \
+	void DESIoT_execSync ## VS (char DESIOT_ATT_UNUSED *payload, size_t DESIOT_ATT_UNUSED len)
+#define DESIOT_EXEC_SYNC(VS, payload, len) \
+	DESIoT_execSync ## VS (payload, len)
+
 // CRC
 #define DESIOT_CRC_GENERATOR 0x1305
 
+// UART
+#define DESIOT_CIR_BUF_SIZE 1024u
+
+// millis
+#define DESIOT_MILLIS_F_NAME DESIoT_millis
+#define DESIOT_MILLIS \
+		uint32_t DESIOT_MILLIS_F_NAME ()
+
 enum DESIoTCMD {
-	DESIOT_CMD_ASSIGN_VIRTUAL_STORAGE
+	DESIOT_CMD_ASSIGN_VIRTUAL_STORAGE,
+	DESIOT_CMD_SYNC_VIRTUAL_STORAGE
 };
 
 typedef struct {
@@ -110,23 +126,91 @@ typedef struct {
 
 typedef struct{
 	uint8_t cmd;
-	uint16_t dataLen : 10;
+	union
+	{
+		uint8_t dataLenArr[2];
+		uint16_t dataLen : 10;
+	};
 	uint8_t data[UINT16_MAX & 0x3FFu];
 } DESIOT_ATT_PACKED DESIoT_dataPacket_t;
+
+typedef struct
+{
+	uint8_t h1;
+	uint8_t h2;
+	DESIoT_dataPacket_t dataPacket;
+	uint8_t t1;
+	uint8_t t2;
+	union
+	{
+		uint16_t crc;
+		uint8_t crcArr[2];
+	};
+} DESIOT_ATT_PACKED DESIoT_Frame_t;
 
 typedef struct{
 	char device_id[DESIOT_DEVICE_ID_SIZE];
 	char config_id[DESIOT_CONFIG_ID_SIZE];
+	uint8_t status;
+	uint8_t index;
+	uint32_t millis;
+	DESIoT_Frame_t frame;
 } DESIoT_Frame_Hander_t;
+
+#define DESIOT_SET_FRAME_FAILED_STATUS(status) status--
+#define DESIOT_SET_FRAME_SUCCESS_STATUS(status) status -= 2
+#define DESIOT_IS_FRAME_ON_PROCESS_STATUS(status) ((status != DESIOT_FRAME_IDLE) && !(status % 3))
+#define DESIOT_TIMEOUT_DURATION 2000
+
+enum DESIOT_FRAME_STATUSES
+{
+	DESIOT_FRAME_IDLE,
+	//
+	DESIOT_FRAME_GATEWAY_SUCCESS,
+	DESIOT_FRAME_GATEWAY_FAILED,
+	DESIOT_FRAME_IN_GATEWAY_PROGRESS,
+};
+
+enum DESIOT_HEAD_FRAME_INDEXES
+{
+	DESIOT_H1_INDEX,
+	DESIOT_H2_INDEX,
+	DESIOT_CMD_INDEX,
+	DESIOT_DATALEN_INDEX
+};
 
 extern DESIoT_Frame_Hander_t hFrame;
 
 void DESIoT_loop();
+void DESIoT_frameArbitrating();
 void DESIOT_Rx1byte(uint8_t rxByte);
 void DESIoT_assignInt(uint8_t VS, size_t integer);
 void DESIoT_sendDataPacket(const size_t dataLen, uint8_t *data);
 void DESIoT_CalculateTable_CRC16();
 uint16_t DESIoT_Compute_CRC16(uint8_t *bytes, const int32_t BYTES_LEN);
+
+void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte);
+void DESIoT_frameFailedHandler();
+void DESIoT_frameSuccessHandler();
+void DESIoT_restartFrameIndexes();
+void DESIoT_frameTimeoutHandler();
+void DESIoT_execSuccessfulFrame();
+void DESIoT_execVSyncWF();
+uint32_t DESIoT_millis();
+// Circular buffer
+typedef struct
+{
+	uint16_t start;
+	uint16_t end;
+	uint8_t buffer[DESIOT_CIR_BUF_SIZE];
+} DESIoT_CBUF_t;
+enum DESIOT_CBUF_STATUS
+{
+	DESIOT_CBUF_OK,
+	DESIOT_CBUF_ERROR
+};
+uint8_t DESIoT_CBUF_getByte(DESIoT_CBUF_t *hCBuf, uint8_t *rx);
+void DESIoT_CBUF_putByte(DESIoT_CBUF_t *hCBuf, uint8_t rx);
 
 // static funcs
 static void DESIoT_begin() {
@@ -139,4 +223,36 @@ static void DESIoT_begin() {
 // weak functions
 DESIOT_SENDBYTES;
 
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS0);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS1);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS2);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS3);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS4);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS5);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS6);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS7);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS8);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS9);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS10);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS11);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS12);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS13);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS14);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS15);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS16);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS17);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS18);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS19);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS20);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS21);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS22);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS23);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS24);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS25);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS26);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS27);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS28);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS29);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS30);
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS31);
 #endif /* INC_DESIOT_DEVICE_H_ */

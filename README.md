@@ -1,3 +1,10 @@
+## 1.8.0
+`27-07-2023`
+- Create a float random from 0 - 40.
+- Create **assignFloat** method.
+- Delay 2 secs in the begin.
+- Create **DESIoT_readVS** method
+
 ## 1.7.0
 `12-07-2023`
 

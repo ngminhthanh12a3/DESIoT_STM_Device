@@ -108,7 +108,8 @@
 
 enum DESIoTCMD {
 	DESIOT_CMD_ASSIGN_VIRTUAL_STORAGE,
-	DESIOT_CMD_SYNC_VIRTUAL_STORAGE
+	DESIOT_CMD_SYNC_VIRTUAL_STORAGE,
+	DESIOT_CMD_READ_VIRTUAL_STORAGE
 };
 
 typedef struct {
@@ -160,7 +161,9 @@ typedef struct{
 #define DESIOT_SET_FRAME_FAILED_STATUS(status) status--
 #define DESIOT_SET_FRAME_SUCCESS_STATUS(status) status -= 2
 #define DESIOT_IS_FRAME_ON_PROCESS_STATUS(status) ((status != DESIOT_FRAME_IDLE) && !(status % 3))
-#define DESIOT_TIMEOUT_DURATION 2000
+#define DESIOT_TIMEOUT_DURATION 2000u
+
+#define DESIOT_STARTUP_TIME 3000u
 
 enum DESIOT_FRAME_STATUSES
 {
@@ -185,6 +188,8 @@ void DESIoT_loop();
 void DESIoT_frameArbitrating();
 void DESIOT_Rx1byte(uint8_t rxByte);
 void DESIoT_assignInt(uint8_t VS, size_t integer);
+void DESIoT_assignFloat(uint8_t VS, float fNumber);
+void DESIoT_readVS(uint8_t VS);
 void DESIoT_sendDataPacket(const size_t dataLen, uint8_t *data);
 void DESIoT_CalculateTable_CRC16();
 uint16_t DESIoT_Compute_CRC16(uint8_t *bytes, const int32_t BYTES_LEN);
@@ -214,6 +219,7 @@ void DESIoT_CBUF_putByte(DESIoT_CBUF_t *hCBuf, uint8_t rx);
 
 // static funcs
 static void DESIoT_begin() {
+	while(DESIoT_millis() < DESIOT_STARTUP_TIME);
 #if defined(DESIOT_DEVICE_ID) && defined(DESIOT_CONFIG_ID)
 	strcpy(hFrame.device_id, DESIOT_DEVICE_ID);
 	strcpy(hFrame.config_id, DESIOT_CONFIG_ID);

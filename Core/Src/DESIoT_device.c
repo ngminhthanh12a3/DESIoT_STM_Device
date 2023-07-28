@@ -12,24 +12,24 @@ DESIoT_Frame_Hander_t hFrame = {.index = 0};
 DESIoT_CBUF_t hGatewayCBuffer = {.start = 0, .end = 0};
 
 void DESIoT_loop() {
-    DESIoT_frameFailedHandler();
-    DESIoT_frameSuccessHandler();
-    DESIoT_frameTimeoutHandler();
-    DESIoT_frameArbitrating();
+	DESIoT_frameFailedHandler();
+	DESIoT_frameSuccessHandler();
+	DESIoT_frameTimeoutHandler();
+	DESIoT_frameArbitrating();
 }
 
 void DESIoT_frameArbitrating()
 {
-    // arbitrating for Gateway
-    if (hFrame.status == DESIOT_FRAME_IDLE || hFrame.status == DESIOT_FRAME_IN_GATEWAY_PROGRESS)
-    {
-        uint8_t rx;
-        if (DESIoT_CBUF_getByte(&hGatewayCBuffer, &rx) == DESIOT_CBUF_OK)
-        {
-            hFrame.status = DESIOT_FRAME_IN_GATEWAY_PROGRESS;
-            DESIoT_FRAME_parsing(&hFrame, rx);
-        }
-    }
+	// arbitrating for Gateway
+	if (hFrame.status == DESIOT_FRAME_IDLE || hFrame.status == DESIOT_FRAME_IN_GATEWAY_PROGRESS)
+	{
+		uint8_t rx;
+		if (DESIoT_CBUF_getByte(&hGatewayCBuffer, &rx) == DESIOT_CBUF_OK)
+		{
+			hFrame.status = DESIOT_FRAME_IN_GATEWAY_PROGRESS;
+			DESIoT_FRAME_parsing(&hFrame, rx);
+		}
+	}
 }
 
 void DESIOT_Rx1byte(uint8_t rxByte)
@@ -52,6 +52,33 @@ void DESIoT_assignInt(uint8_t VS, size_t integer)
 
 	DESIoT_sendDataPacket(DESIOT_CMD_LEN + DESIOT_DATALEN_LEN + dataPacket.dataLen,
 			(uint8_t*)&dataPacket);
+}
+
+void DESIoT_assignFloat(uint8_t VS, float fNumber)
+{
+	DESIoT_dataPacket_t dataPacket;
+	dataPacket.cmd = DESIOT_CMD_ASSIGN_VIRTUAL_STORAGE;
+	dataPacket.dataLen = DESIOT_ADDITIONAL_DATA_SIZE + sizeof(VS) + sizeof(fNumber); // add bytes of additional data
+
+	// ignore 12-byte data for device ID
+	dataPacket.data[DESIOT_ADDITIONAL_DATA_SIZE] = VS;
+	memcpy(dataPacket.data + DESIOT_ADDITIONAL_DATA_SIZE + 1, &fNumber, sizeof(fNumber));
+
+	DESIoT_sendDataPacket(DESIOT_CMD_LEN + DESIOT_DATALEN_LEN + dataPacket.dataLen,
+			(uint8_t*)&dataPacket);
+}
+
+void DESIoT_readVS(uint8_t VS)
+{
+	DESIoT_dataPacket_t dataPacket;
+		dataPacket.cmd = DESIOT_CMD_READ_VIRTUAL_STORAGE;
+		dataPacket.dataLen = DESIOT_ADDITIONAL_DATA_SIZE + sizeof(VS); // add bytes of additional data
+
+		// ignore 12-byte data for device ID
+		dataPacket.data[DESIOT_ADDITIONAL_DATA_SIZE] = VS;
+
+		DESIoT_sendDataPacket(DESIOT_CMD_LEN + DESIOT_DATALEN_LEN + dataPacket.dataLen,
+				(uint8_t*)&dataPacket);
 }
 
 
@@ -136,144 +163,144 @@ uint16_t DESIoT_Compute_CRC16(uint8_t *bytes, const int32_t BYTES_LEN)
 
 void DESIoT_CBUF_putByte(DESIoT_CBUF_t *hCBuf, uint8_t rx)
 {
-    hCBuf->buffer[hCBuf->end++] = rx;
-    hCBuf->end %= DESIOT_CIR_BUF_SIZE;
+	hCBuf->buffer[hCBuf->end++] = rx;
+	hCBuf->end %= DESIOT_CIR_BUF_SIZE;
 }
 
 uint8_t DESIoT_CBUF_getByte(DESIoT_CBUF_t *hCBuf, uint8_t *rx)
 {
-    if (hCBuf->end != hCBuf->start)
-    {
-        *rx = hCBuf->buffer[hCBuf->start++];
-        hCBuf->start %= DESIOT_CIR_BUF_SIZE;
-        return DESIOT_CBUF_OK;
-    }
+	if (hCBuf->end != hCBuf->start)
+	{
+		*rx = hCBuf->buffer[hCBuf->start++];
+		hCBuf->start %= DESIOT_CIR_BUF_SIZE;
+		return DESIOT_CBUF_OK;
+	}
 
-    return DESIOT_CBUF_ERROR;
+	return DESIOT_CBUF_ERROR;
 }
 
 void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte)
 {
-    switch (hFrame->index)
-    {
-    case DESIOT_H1_INDEX:
-        hFrame->millis = DESIoT_millis();
-        if (byte == DESIOT_H1_DEFAULT)
-            hFrame->frame.h1 = byte;
+	switch (hFrame->index)
+	{
+	case DESIOT_H1_INDEX:
+		hFrame->millis = DESIoT_millis();
+		if (byte == DESIOT_H1_DEFAULT)
+			hFrame->frame.h1 = byte;
 
-        else
-            DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
-        break;
-    case DESIOT_H2_INDEX:
-        if (byte == DESIOT_H2_DEFAULT)
-            hFrame->frame.h2 = byte;
-        else
-            DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
-        break;
-    case DESIOT_CMD_INDEX:
-        hFrame->frame.dataPacket.cmd = byte;
-        break;
-    case DESIOT_DATALEN_INDEX:
-        hFrame->frame.dataPacket.dataLenArr[0] = byte;
-        break;
-    case DESIOT_DATALEN_INDEX + 1:
-        hFrame->frame.dataPacket.dataLenArr[1] = byte;
-        break;
-    default:
-        if (hFrame->index == (DESIOT_HEAD_FRAME_LEN + hFrame->frame.dataPacket.dataLen)) // t1
-        {
-            if (byte == DESIOT_T1_DEFAULT)
-                hFrame->frame.t1 = byte;
-            else
-                DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
-        }
-        else if (hFrame->index == (DESIOT_HEAD_FRAME_LEN + hFrame->frame.dataPacket.dataLen + 1)) // t2
-        {
-            if (byte == DESIOT_T2_DEFAULT)
-                hFrame->frame.t2 = byte;
-            else
-                DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
-        }
-        else if (hFrame->index == (DESIOT_HEAD_FRAME_LEN + hFrame->frame.dataPacket.dataLen + 2)) // crc1
-        {
-            hFrame->frame.crcArr[0] = byte;
-        }
-        else if (hFrame->index == (DESIOT_HEAD_FRAME_LEN + hFrame->frame.dataPacket.dataLen + 3)) // crc2
-        {
-            hFrame->frame.crcArr[1] = byte;
-            uint16_t crcCalculate = DESIoT_Compute_CRC16((uint8_t *)&hFrame->frame.dataPacket, DESIOT_CMD_LEN + DESIOT_DATALEN_LEN + hFrame->frame.dataPacket.dataLen);
-            if (crcCalculate == hFrame->frame.crc)
-                DESIOT_SET_FRAME_SUCCESS_STATUS(hFrame->status);
-            else
-            {
-                DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
-            }
-        }
-        else
-        {
-            hFrame->frame.dataPacket.data[hFrame->index - (DESIOT_HEAD_LEN + DESIOT_CMD_LEN + DESIOT_DATALEN_LEN)] = byte;
-        }
-        break;
-    }
-    hFrame->index++;
+		else
+			DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
+		break;
+	case DESIOT_H2_INDEX:
+		if (byte == DESIOT_H2_DEFAULT)
+			hFrame->frame.h2 = byte;
+		else
+			DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
+		break;
+	case DESIOT_CMD_INDEX:
+		hFrame->frame.dataPacket.cmd = byte;
+		break;
+	case DESIOT_DATALEN_INDEX:
+		hFrame->frame.dataPacket.dataLenArr[0] = byte;
+		break;
+	case DESIOT_DATALEN_INDEX + 1:
+	hFrame->frame.dataPacket.dataLenArr[1] = byte;
+	break;
+	default:
+		if (hFrame->index == (DESIOT_HEAD_FRAME_LEN + hFrame->frame.dataPacket.dataLen)) // t1
+		{
+			if (byte == DESIOT_T1_DEFAULT)
+				hFrame->frame.t1 = byte;
+			else
+				DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
+		}
+		else if (hFrame->index == (DESIOT_HEAD_FRAME_LEN + hFrame->frame.dataPacket.dataLen + 1)) // t2
+		{
+			if (byte == DESIOT_T2_DEFAULT)
+				hFrame->frame.t2 = byte;
+			else
+				DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
+		}
+		else if (hFrame->index == (DESIOT_HEAD_FRAME_LEN + hFrame->frame.dataPacket.dataLen + 2)) // crc1
+		{
+			hFrame->frame.crcArr[0] = byte;
+		}
+		else if (hFrame->index == (DESIOT_HEAD_FRAME_LEN + hFrame->frame.dataPacket.dataLen + 3)) // crc2
+		{
+			hFrame->frame.crcArr[1] = byte;
+			uint16_t crcCalculate = DESIoT_Compute_CRC16((uint8_t *)&hFrame->frame.dataPacket, DESIOT_CMD_LEN + DESIOT_DATALEN_LEN + hFrame->frame.dataPacket.dataLen);
+			if (crcCalculate == hFrame->frame.crc)
+				DESIOT_SET_FRAME_SUCCESS_STATUS(hFrame->status);
+			else
+			{
+				DESIOT_SET_FRAME_FAILED_STATUS(hFrame->status);
+			}
+		}
+		else
+		{
+			hFrame->frame.dataPacket.data[hFrame->index - (DESIOT_HEAD_LEN + DESIOT_CMD_LEN + DESIOT_DATALEN_LEN)] = byte;
+		}
+		break;
+	}
+	hFrame->index++;
 }
 
 
 void DESIoT_frameFailedHandler()
 {
-    switch (hFrame.status)
-    {
-    case DESIOT_FRAME_GATEWAY_FAILED:
-        DESIoT_restartFrameIndexes();
-        break;
-    }
+	switch (hFrame.status)
+	{
+	case DESIOT_FRAME_GATEWAY_FAILED:
+		DESIoT_restartFrameIndexes();
+		break;
+	}
 }
 
 void DESIoT_frameSuccessHandler()
 {
-    switch (hFrame.status)
-    {
-    case DESIOT_FRAME_GATEWAY_SUCCESS:
+	switch (hFrame.status)
+	{
+	case DESIOT_FRAME_GATEWAY_SUCCESS:
 
-    	DESIoT_execSuccessfulFrame();
-        DESIoT_restartFrameIndexes();
+		DESIoT_execSuccessfulFrame();
+		DESIoT_restartFrameIndexes();
 
-        break;
+		break;
 
-    default:
-        break;
-    }
+	default:
+		break;
+	}
 }
 
 void DESIoT_restartFrameIndexes()
 {
-    hFrame.status = DESIOT_FRAME_IDLE;
-    hFrame.index = 0;
+	hFrame.status = DESIOT_FRAME_IDLE;
+	hFrame.index = 0;
 }
 
 void DESIoT_frameTimeoutHandler()
 {
-    if (DESIOT_IS_FRAME_ON_PROCESS_STATUS(hFrame.status))
-        if (DESIOT_MILLIS_F_NAME() - hFrame.millis > DESIOT_TIMEOUT_DURATION)
-        {
-            DESIoT_restartFrameIndexes();
-        }
+	if (DESIOT_IS_FRAME_ON_PROCESS_STATUS(hFrame.status))
+		if (DESIOT_MILLIS_F_NAME() - hFrame.millis > DESIOT_TIMEOUT_DURATION)
+		{
+			DESIoT_restartFrameIndexes();
+		}
 }
 
 void DESIoT_execSuccessfulFrame() {
 	switch (hFrame.frame.dataPacket.cmd) {
-		case DESIOT_CMD_SYNC_VIRTUAL_STORAGE:
-			DESIoT_execVSyncWF();
-			break;
-		default:
-			break;
+	case DESIOT_CMD_SYNC_VIRTUAL_STORAGE:
+		DESIoT_execVSyncWF();
+		break;
+	default:
+		break;
 	}
 }
 
 void DESIoT_execVSyncWF() {
 	char payload[DESIOT_MAX_VSSYNC_PAYLOAD_SIZE];
-	size_t len = hFrame.frame.dataPacket.dataLen - 1;
 	uint8_t VSID = hFrame.frame.dataPacket.data[0];
+	size_t len = hFrame.frame.dataPacket.dataLen - sizeof(VSID);
 
 	memcpy(payload,hFrame.frame.dataPacket.data + 1, len);
 

@@ -50,6 +50,7 @@ UART_HandleTypeDef huart6;
 /* USER CODE BEGIN PV */
 uint8_t ITReceive;
 uint32_t lastTick = 0;
+uint8_t testMode;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -98,6 +99,7 @@ int main(void)
 	HAL_UART_Receive_IT(&huart6, &ITReceive, 1);
 	DESIoT_begin();
 	DESIoT_readVS(DESIOT_VS1);
+	DESIoT_readVS(DESIOT_VS3);
 	srand((unsigned int)time(NULL));
 
 	/* USER CODE END 2 */
@@ -240,6 +242,9 @@ DESIOT_MILLIS {
 }
 DESIOT_DEF_EXEC_SYNC(DESIOT_VS1) {
 	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, payload[0]);
+}
+DESIOT_DEF_EXEC_SYNC(DESIOT_VS3) {
+	testMode =  payload[0];
 }
 /* USER CODE END 4 */
 

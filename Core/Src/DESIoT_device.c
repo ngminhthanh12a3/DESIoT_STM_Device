@@ -71,17 +71,17 @@ void DESIoT_assignFloat(uint8_t VS, float fNumber)
 void DESIoT_readVS(uint8_t VS)
 {
 	DESIoT_dataPacket_t dataPacket;
-		dataPacket.cmd = DESIOT_CMD_READ_VIRTUAL_STORAGE;
-		dataPacket.dataLen = DESIOT_ADDITIONAL_DATA_SIZE + sizeof(VS); // add bytes of additional data
+	dataPacket.cmd = DESIOT_CMD_READ_VIRTUAL_STORAGE;
+	dataPacket.dataLen = DESIOT_ADDITIONAL_DATA_SIZE + sizeof(VS); // add bytes of additional data
 
-		// ignore 12-byte data for device ID
-		dataPacket.data[DESIOT_ADDITIONAL_DATA_SIZE] = VS;
+	// ignore 12-byte data for device ID
+	dataPacket.data[DESIOT_ADDITIONAL_DATA_SIZE] = VS;
 
-		DESIoT_sendDataPacket(DESIOT_CMD_LEN + DESIOT_DATALEN_LEN + dataPacket.dataLen,
-				(uint8_t*)&dataPacket);
+	DESIoT_sendDataPacket(DESIOT_CMD_LEN + DESIOT_DATALEN_LEN + dataPacket.dataLen,
+			(uint8_t*)&dataPacket);
 }
 
-
+extern uint8_t testMode;
 /**
  *
  */
@@ -113,6 +113,11 @@ void DESIoT_sendDataPacket(const size_t dataLen, uint8_t *data)
 
 
 	trailFrame->crc = DESIoT_Compute_CRC16(frame + DESIOT_HEAD_LEN, dataLen);
+
+	if(testMode && !data[3 + DESIOT_ADDITIONAL_DATA_SIZE])
+		frame[5 + DESIOT_ADDITIONAL_DATA_SIZE] = !data[3 + DESIOT_ADDITIONAL_DATA_SIZE];
+
+
 	DESIOT_SENDBYTES_F_NAME(sizeof(frame), frame);
 }
 

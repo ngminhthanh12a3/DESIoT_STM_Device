@@ -76,8 +76,8 @@
 // DESIoT default values
 #define DESIOT_H1_DEFAULT 0x7u
 #define DESIOT_H2_DEFAULT 0x17u
-#define DESIOT_T1_DEFAULT 0x7u
-#define DESIOT_T2_DEFAULT 0x17u
+#define DESIOT_T1_DEFAULT 0x70u
+#define DESIOT_T2_DEFAULT 0x71u
 
 #define DESIOT_SENDBYTES_F_NAME DESIoT_sendBytes
 #define DESIOT_SENDBYTES \
@@ -100,6 +100,22 @@
 
 // UART
 #define DESIOT_CIR_BUF_SIZE 1024u
+
+// Circular buffer
+typedef struct
+{
+	uint16_t start:10;
+	uint16_t end:10;
+	uint16_t startRestore : 10;
+	uint8_t buffer[DESIOT_CIR_BUF_SIZE];
+} DESIoT_CBUF_t;
+enum DESIOT_CBUF_STATUS
+{
+	DESIOT_CBUF_OK,
+	DESIOT_CBUF_ERROR
+};
+uint8_t DESIoT_CBUF_getByte(DESIoT_CBUF_t *hCBuf, uint8_t *rx);
+void DESIoT_CBUF_putByte(DESIoT_CBUF_t *hCBuf, uint8_t rx);
 
 // millis
 #define DESIOT_MILLIS_F_NAME DESIoT_millis
@@ -156,6 +172,8 @@ typedef struct{
 	uint8_t index;
 	uint32_t millis;
 	DESIoT_Frame_t frame;
+
+	DESIoT_CBUF_t *curCBuf;
 } DESIoT_Frame_Hander_t;
 
 #define DESIOT_SET_FRAME_FAILED_STATUS(status) status--
@@ -194,28 +212,16 @@ void DESIoT_sendDataPacket(const size_t dataLen, uint8_t *data);
 void DESIoT_CalculateTable_CRC16();
 uint16_t DESIoT_Compute_CRC16(uint8_t *bytes, const int32_t BYTES_LEN);
 
-void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte);
+void DESIoT_setUpStartOfParsing(DESIoT_Frame_Hander_t *hFrame, DESIoT_CBUF_t *curCBuf);
+void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte, DESIoT_CBUF_t *curCBuf);
 void DESIoT_frameFailedHandler();
 void DESIoT_frameSuccessHandler();
 void DESIoT_restartFrameIndexes();
+void DESIoT_restartCBufIndexes();
 void DESIoT_frameTimeoutHandler();
 void DESIoT_execSuccessfulFrame();
 void DESIoT_execVSyncWF();
 uint32_t DESIoT_millis();
-// Circular buffer
-typedef struct
-{
-	uint16_t start;
-	uint16_t end;
-	uint8_t buffer[DESIOT_CIR_BUF_SIZE];
-} DESIoT_CBUF_t;
-enum DESIOT_CBUF_STATUS
-{
-	DESIOT_CBUF_OK,
-	DESIOT_CBUF_ERROR
-};
-uint8_t DESIoT_CBUF_getByte(DESIoT_CBUF_t *hCBuf, uint8_t *rx);
-void DESIoT_CBUF_putByte(DESIoT_CBUF_t *hCBuf, uint8_t rx);
 
 // static funcs
 static void DESIoT_begin() {

@@ -1,3 +1,10 @@
+## 1.10.0
+
+`29-07-2023`
+
+- Flush CBuf to the next headers.
+  - Set this method when
+
 ## 1.9.0
 `29-07-2023`
 

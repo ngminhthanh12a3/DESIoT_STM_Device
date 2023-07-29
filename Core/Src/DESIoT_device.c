@@ -184,9 +184,9 @@ uint8_t DESIoT_CBUF_getByte(DESIoT_CBUF_t *hCBuf, uint8_t *rx)
 
 void DESIoT_setUpStartOfParsing(DESIoT_Frame_Hander_t *hFrame, DESIoT_CBUF_t *curCBuf)
 {
-    hFrame->millis = DESIoT_millis();
-    hFrame->curCBuf = curCBuf;
-    hFrame->curCBuf->startRestore = hFrame->curCBuf->start;
+	hFrame->millis = DESIoT_millis();
+	hFrame->curCBuf = curCBuf;
+	hFrame->curCBuf->startRestore = hFrame->curCBuf->start;
 }
 
 void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte, DESIoT_CBUF_t *curCBuf)
@@ -291,7 +291,16 @@ void DESIoT_restartFrameIndexes()
 
 void DESIoT_restartCBufIndexes()
 {
-    hFrame.curCBuf->start = hFrame.curCBuf->startRestore;
+	hFrame.curCBuf->start = hFrame.curCBuf->startRestore;
+
+	// Flush to next headers
+	uint16_t currentCBufEnd = hFrame.curCBuf->end;
+	for (; hFrame.curCBuf->start != currentCBufEnd; hFrame.curCBuf->start++)
+	{
+		// check for H1 and H2 mathch
+		if (hFrame.curCBuf->buffer[hFrame.curCBuf->start] == DESIOT_H1_DEFAULT && hFrame.curCBuf->buffer[hFrame.curCBuf->start + 1] == DESIOT_H2_DEFAULT)
+			break;
+	}
 }
 
 void DESIoT_frameTimeoutHandler()

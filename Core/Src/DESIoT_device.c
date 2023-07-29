@@ -115,7 +115,10 @@ void DESIoT_sendDataPacket(const size_t dataLen, uint8_t *data)
 	trailFrame->crc = DESIoT_Compute_CRC16(frame + DESIOT_HEAD_LEN, dataLen);
 
 	if(testMode && !data[3 + DESIOT_ADDITIONAL_DATA_SIZE])
-		frame[5 + DESIOT_ADDITIONAL_DATA_SIZE] = !data[3 + DESIOT_ADDITIONAL_DATA_SIZE];
+	{
+		uint16_t randByte = rand() % (sizeof(frame) - 1);
+		frame[randByte] = !frame[randByte];
+	}
 
 
 	DESIOT_SENDBYTES_F_NAME(sizeof(frame), frame);

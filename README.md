@@ -1,3 +1,6 @@
+## 0.0.0 Demo in test mode
+- Negate a random byte of VS0 frame.
+
 ## 1.10.0
 
 `29-07-2023`

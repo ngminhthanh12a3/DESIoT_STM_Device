@@ -1,3 +1,7 @@
+## 1.11.0
+`29-07-2023`
+
+- Change TIMEOUT value. to (10 ms)
 ## 0.0.0 Demo in test mode
 - Negate a random byte of VS0 frame.
 

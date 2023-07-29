@@ -21,8 +21,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#define DESIOT_CONFIG_ID "64c35b01b8f8d3dd7653f5cf"
-#define DESIOT_DEVICE_ID "64c35b08b8f8d3dd7653f5d3"
+#define DESIOT_CONFIG_ID "64c1e65759a0b339c83228c7"
+#define DESIOT_DEVICE_ID "64c1e66659a0b339c83228cb"
 
 #include <stdlib.h>
 #include <time.h>

@@ -12,22 +12,33 @@ DESIoT_Frame_Hander_t hFrame = {.index = 0};
 DESIoT_CBUF_t hGatewayCBuffer = {.start = 0, .end = 0};
 
 void DESIoT_loop() {
+	DESIoT_frameArbitrating();
+	DESIoT_frameProssessLoop();
+}
+
+void DESIoT_frameProssessLoop()
+{
+	while (DESIOT_IS_FRAME_ON_PROCESS_STATUS(hFrame.status))
+	{
+		DESIoT_frameTimeoutHandler();
+
+		uint8_t rx;
+		if (DESIoT_CBUF_getByte(hFrame.curCBuf, &rx) == DESIOT_CBUF_OK)
+			DESIoT_FRAME_parsing(&hFrame, rx, hFrame.curCBuf);
+	}
 	DESIoT_frameFailedHandler();
 	DESIoT_frameSuccessHandler();
-	DESIoT_frameTimeoutHandler();
-	DESIoT_frameArbitrating();
 }
 
 void DESIoT_frameArbitrating()
 {
 	// arbitrating for Gateway
-	if (hFrame.status == DESIOT_FRAME_IDLE || hFrame.status == DESIOT_FRAME_IN_GATEWAY_PROGRESS)
+	if (hFrame.status == DESIOT_FRAME_IDLE)
 	{
-		uint8_t rx;
-		if (DESIoT_CBUF_getByte(&hGatewayCBuffer, &rx) == DESIOT_CBUF_OK)
+		if (!DESIoT_CBUF_isEmpty(&hGatewayCBuffer))
 		{
 			hFrame.status = DESIOT_FRAME_IN_GATEWAY_PROGRESS;
-			DESIoT_FRAME_parsing(&hFrame, rx, &hGatewayCBuffer);
+			DESIoT_setUpStartOfParsing(&hFrame, &hGatewayCBuffer);
 		}
 	}
 }
@@ -166,6 +177,10 @@ void DESIoT_CBUF_putByte(DESIoT_CBUF_t *hCBuf, uint8_t rx)
 	hCBuf->buffer[hCBuf->end++] = rx;
 }
 
+uint8_t DESIoT_CBUF_isEmpty(DESIoT_CBUF_t *hCBuf) {
+	return hCBuf->end == hCBuf->start;
+}
+
 uint8_t DESIoT_CBUF_getByte(DESIoT_CBUF_t *hCBuf, uint8_t *rx)
 {
 	if (hCBuf->end != hCBuf->start)
@@ -189,7 +204,7 @@ void DESIoT_FRAME_parsing(DESIoT_Frame_Hander_t *hFrame, uint8_t byte, DESIoT_CB
 	switch (hFrame->index)
 	{
 	case DESIOT_H1_INDEX:
-		DESIoT_setUpStartOfParsing(hFrame, curCBuf);
+		hFrame->curCBuf->startRestore = hFrame->curCBuf->start;
 		if (byte == DESIOT_H1_DEFAULT)
 			hFrame->frame.h1 = byte;
 

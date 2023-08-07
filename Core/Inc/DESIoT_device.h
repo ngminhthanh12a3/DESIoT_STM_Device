@@ -116,6 +116,7 @@ enum DESIOT_CBUF_STATUS
 };
 uint8_t DESIoT_CBUF_getByte(DESIoT_CBUF_t *hCBuf, uint8_t *rx);
 void DESIoT_CBUF_putByte(DESIoT_CBUF_t *hCBuf, uint8_t rx);
+uint8_t DESIoT_CBUF_isEmpty(DESIoT_CBUF_t *hCBuf);
 
 // millis
 #define DESIOT_MILLIS_F_NAME DESIoT_millis
@@ -204,6 +205,7 @@ extern DESIoT_Frame_Hander_t hFrame;
 
 void DESIoT_loop();
 void DESIoT_frameArbitrating();
+void DESIoT_frameProssessLoop();
 void DESIOT_Rx1byte(uint8_t rxByte);
 void DESIoT_assignInt(uint8_t VS, size_t integer);
 void DESIoT_assignFloat(uint8_t VS, float fNumber);

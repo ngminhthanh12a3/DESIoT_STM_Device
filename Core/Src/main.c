@@ -45,19 +45,26 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
- UART_HandleTypeDef huart6;
+ ADC_HandleTypeDef hadc1;
+
+UART_HandleTypeDef huart6;
 
 /* USER CODE BEGIN PV */
 uint8_t ITReceive;
 uint32_t lastTick = 0;
+
+float realTemp;
+uint8_t sensorTouched = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART6_UART_Init(void);
+static void MX_ADC1_Init(void);
 /* USER CODE BEGIN PFP */
-
+void getRealTemperature();
+void checkTouchSensor();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -94,6 +101,7 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART6_UART_Init();
+  MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
 	HAL_UART_Receive_IT(&huart6, &ITReceive, 1);
 	DESIoT_begin();
@@ -110,11 +118,13 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 		DESIoT_loop();
+
 		if(HAL_GetTick() - lastTick > 1000)
 		{
 			lastTick = HAL_GetTick();
-			float fNumber = ((float)rand() / (float)RAND_MAX) * 45;
-			DESIoT_assignFloat(DESIOT_VS0, fNumber);
+			checkTouchSensor();
+			getRealTemperature();
+			DESIoT_assignFloat(DESIOT_VS0, realTemp);
 			DESIoT_assignInt(DESIOT_VS2, lastTick % 1000);
 		}
 	}
@@ -163,6 +173,58 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+
+  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
+  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc1.Init.ScanConvMode = ENABLE;
+  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_2;
+  sConfig.Rank = 1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_480CYCLES;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
+}
+
+/**
   * @brief USART6 Initialization Function
   * @param None
   * @retval None
@@ -208,10 +270,17 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOE_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_0, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : PD1 */
+  GPIO_InitStruct.Pin = GPIO_PIN_1;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PE0 */
   GPIO_InitStruct.Pin = GPIO_PIN_0;
@@ -219,6 +288,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI1_IRQn, 1, 0);
+  HAL_NVIC_EnableIRQ(EXTI1_IRQn);
 
 }
 
@@ -239,8 +312,47 @@ DESIOT_MILLIS {
 	return HAL_GetTick();
 }
 DESIOT_DEF_EXEC_SYNC(DESIOT_VS1) {
-	HAL_GPIO_WritePin(GPIOE, GPIO_PIN_0, payload[0]);
+
+	uint8_t ledState = HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_0);
+	if(ledState != payload[0])
+		HAL_GPIO_WritePin(GPIOE, GPIO_PIN_0, payload[0]);
 }
+
+void getRealTemperature()
+{
+	HAL_ADC_Start(&hadc1);
+	if(HAL_ADC_PollForConversion(&hadc1, 5) == HAL_OK)
+	{
+		uint32_t adcVal = HAL_ADC_GetValue(&hadc1);
+		float tempFahrenheit = (adcVal/4096.0)*3.3*100; // Fahrenheit
+		realTemp = (tempFahrenheit - 32) * 0.555; // celcius
+
+	}
+	HAL_ADC_Stop(&hadc1);
+}
+
+void checkTouchSensor()
+{
+	if(sensorTouched)
+	{
+		sensorTouched = 0;
+
+		HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_0);
+
+		//
+		uint8_t ledState = HAL_GPIO_ReadPin(GPIOE, GPIO_PIN_0);
+		DESIoT_assignInt(DESIOT_VS1, ledState);
+	}
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	if(GPIO_Pin == GPIO_PIN_1)
+	{
+		sensorTouched = 1;
+	}
+}
+
 /* USER CODE END 4 */
 
 /**

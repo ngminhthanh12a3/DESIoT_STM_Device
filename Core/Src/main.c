@@ -126,6 +126,7 @@ int main(void)
 			getRealTemperature();
 			DESIoT_assignFloat(DESIOT_VS0, realTemp);
 			DESIoT_assignInt(DESIOT_VS2, lastTick % 1000);
+			DESIoT_assignString(DESIOT_VS5, "A Test String");
 		}
 	}
   /* USER CODE END 3 */

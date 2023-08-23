@@ -1,4 +1,9 @@
 ## 1.12.0
+
+`23-08-2023`
+
+- Create new API for update String value for a VS (**DESIoT_assignString**).
+
 `07-08-2023`
 
 - Reconstruct the **DESIoT_G_loop**.
